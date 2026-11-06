@@ -18,8 +18,8 @@ log = logging.getLogger("studyapp")
 
 load_dotenv()
 
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/api/generate")
-MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:1b")
+OLLAMA_URL = os.getenv("OLLAMA_URL", "https://ollama.com/api/generate")
+MODEL = os.getenv("OLLAMA_MODEL", "gpt-oss:120b")
 OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY", "")
 HEADERS = {"Authorization": f"Bearer {OLLAMA_API_KEY}"} if OLLAMA_API_KEY else {}
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://127.0.0.1:5500").split(",")
