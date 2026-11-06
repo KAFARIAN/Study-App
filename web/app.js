@@ -1,4 +1,4 @@
-const API = "http://127.0.0.1:8000";
+const API = "https://study-app-1dga.onrender.com";
 
 document.getElementById("ping").addEventListener("click", async () => {
   const out = document.getElementById("out");
