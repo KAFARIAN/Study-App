@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Study Buddy</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="auth" class="auth">
+    <div class="auth-box">
+      <h2>Study App</h2>
+      <p class="auth-sub">Sign in to continue</p>
+      <input type="email" id="auth-email" placeholder="Email" autocomplete="email">
+      <input type="password" id="auth-password" placeholder="Password (at least 6 characters)" autocomplete="current-password">
+      <div class="auth-actions">
+        <button id="auth-signin">Sign in</button>
+        <button id="auth-signup">Create account</button>
+      </div>
+      <p id="auth-msg" class="auth-msg"></p>
+    </div>
+  </div>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="side-top">Study App</div>
+
+      <nav class="chat-list">
+        <button class="tab active" data-tab="flashcards">
+          <span class="avatar a1">F</span>
+          <span class="meta">
+            <span class="name">Flashcards</span>
+            <span class="sub">Question and answer cards</span>
+          </span>
+        </button>
+        <button class="tab" data-tab="quiz">
+          <span class="avatar a2">Q</span>
+          <span class="meta">
+            <span class="name">Quiz</span>
+            <span class="sub">Test what you know</span>
+          </span>
+        </button>
+        <button class="tab" data-tab="notes">
+          <span class="avatar a3">N</span>
+          <span class="meta">
+            <span class="name">Notes</span>
+            <span class="sub">Summary notes and key terms</span>
+          </span>
+        </button>
+        <button class="tab" data-tab="history">
+          <span class="avatar a4">H</span>
+          <span class="meta">
+            <span class="name">History</span>
+            <span class="sub">Saved flashcards, quizzes and notes</span>
+          </span>
+        </button>
+      </nav>
+
+      <div class="side-foot">
+        <div class="account" id="account" hidden>
+          <span id="account-email"></span>
+          <button id="signout">Sign out</button>
+        </div>
+        <button id="ping">Test backend</button>
+        <p id="out"></p>
+      </div>
+    </aside>
+
+    <section class="main">
+      <header class="main-head">
+        <div id="head-avatar" class="avatar a1">F</div>
+        <div class="meta">
+          <span id="head-title" class="name">Flashcards</span>
+          <span id="head-sub" class="sub">Question and answer cards</span>
+        </div>
+      </header>
+
+      <div class="composer">
+        <div class="composer-inner">
+          <textarea id="material" placeholder="Paste your study material..."></textarea>
+          <div class="file-row">
+            <label for="file" class="file-btn">Choose File</label>
+            <input type="file" id="file" accept=".pdf,.docx,.txt,.md" hidden>
+            <span id="no-file">No file chosen</span>
+            <span id="file-chip" class="file-chip" hidden>
+              <span id="file-name"></span>
+              <button id="file-remove" title="Remove file">&times;</button>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="messages">
+
+        <section id="tab-flashcards" class="tab-panel">
+          <div class="options">
+            <label>Number of cards <input type="number" id="count" value="5" min="1" max="20"></label>
+            <label><input type="checkbox" id="study-mode" checked> Study mode</label>
+            <label><input type="checkbox" id="only-learning"> Only still learning</label>
+            <button id="generate" class="gen">Generate flashcards</button>
+          </div>
+          <div id="cards"></div>
+        </section>
+
+        <section id="tab-quiz" class="tab-panel" hidden>
+          <div class="options">
+            <div class="types">
+              <label><input type="radio" name="qtype" class="qtype" value="mcq" checked> Multiple choice</label>
+              <label><input type="radio" name="qtype" class="qtype" value="tf"> True / False</label>
+              <label><input type="radio" name="qtype" class="qtype" value="fill"> Fill in the blank</label>
+              <label><input type="radio" name="qtype" class="qtype" value="mcq,tf,fill"> Mixed</label>
+            </div>
+            <label>Questions <input type="number" id="qcount" value="5" min="1" max="20"></label>
+            <button id="generate-quiz" class="gen">Generate quiz</button>
+          </div>
+          <div id="quiz"></div>
+        </section>
+
+        <section id="tab-notes" class="tab-panel" hidden>
+          <div class="options">
+            <label>Detail level
+              <select id="level">
+                <option value="brief">Brief</option>
+                <option value="standard" selected>Standard</option>
+                <option value="detailed">Detailed</option>
+              </select>
+            </label>
+            <button id="generate-notes" class="gen">Generate notes</button>
+            <button id="copy-notes" hidden>Copy notes</button>
+          </div>
+          <div id="notes"></div>
+        </section>
+
+        <section id="tab-history" class="tab-panel" hidden>
+          <div id="history-list"></div>
+          <div class="options">
+            <label>Show
+              <select id="history-filter">
+                <option value="all">All</option>
+                <option value="flashcards">Flashcards</option>
+                <option value="quiz">Quizzes</option>
+                <option value="notes">Notes</option>
+              </select>
+            </label>
+            <button id="clear-history">Delete all history</button>
+          </div>
+        </section>
+      </div>
+
+    </section>
+
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="history.js"></script>
+  <script src="auth.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
