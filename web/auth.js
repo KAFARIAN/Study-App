@@ -27,6 +27,7 @@ function applySession(session) {
       document.getElementById(id).innerHTML = "";
     });
     askReset(); // clear the chat and any cached file text
+    gameReset();
   }
 }
 
