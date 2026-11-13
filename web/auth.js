@@ -26,6 +26,7 @@ function applySession(session) {
     ["cards", "quiz", "notes", "history-list"].forEach((id) => {
       document.getElementById(id).innerHTML = "";
     });
+    askReset(); // clear the chat and any cached file text
   }
 }
 
