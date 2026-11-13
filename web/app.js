@@ -580,6 +580,9 @@ async function authHeaders(extra) {
 }
 // ---- Ask / Explain ----
 let askSource = "";    // describes the material the current conversation is about
+let askLog = [];          // the full conversation, saved to History
+let askHistoryId = null;  // which History item this conversation belongs to
+let askResumed = false;   // true right after opening a saved chat
 let askHistory = [];   // [{ role: "user" | "assistant", content }]
 const fileCache = {};  // file key -> extracted text, so a file is only read once
 const chatBox = document.getElementById("chat");
@@ -595,9 +598,34 @@ chatHint();
 
 function askReset() {
   askHistory = [];
+  askLog = [];
+  askHistoryId = null;
+  askResumed = false;
   askSource = "";
   Object.keys(fileCache).forEach((k) => delete fileCache[k]);
   chatHint();
+}
+
+function saveChat(question, file) {
+  const exists = askHistoryId && loadHistory().some((x) => x.id === askHistoryId);
+  if (exists) {
+    updateHistory(askHistoryId, (it) => { it.data = askLog.slice(); });
+  } else {
+    // new chat, or the saved one was deleted: start fresh from this exchange
+    askLog = askLog.slice(-2);
+    askHistoryId = addHistory({ type: "ask", title: makeTitle(question, file), data: askLog.slice() });
+  }
+}
+
+function loadChat(h) {
+  chatBox.innerHTML = "";
+  h.data.forEach((m) => addMsg(m.role === "user" ? "user" : "bot", m.content));
+  addMsg("note", "Saved conversation. To keep asking, paste or attach the same material above.");
+  askLog = h.data.map((m) => ({ ...m }));
+  askHistory = askLog.slice(-8);
+  askHistoryId = h.id;
+  askResumed = true;
+  askSource = "";
 }
 
 function addMsg(kind, text) {
@@ -644,9 +672,15 @@ async function sendAsk() {
   const pending = addMsg("bot pending", "Thinking...");
   try {
     const m = await getAskMaterial();
-    if (m.key !== askSource) { // new material means a new conversation
+    if (m.key !== askSource) {
+      if (askResumed) {
+        askResumed = false;   // continuing a saved chat with the material added again
+      } else {
+        askHistory = [];      // new material means a new conversation
+        askLog = [];
+        askHistoryId = null;
+      }
       askSource = m.key;
-      askHistory = [];
     }
     const res = await fetch(`${API}/ask`, {
       method: "POST",
@@ -664,6 +698,9 @@ async function sendAsk() {
     pending.textContent = data.answer;
     askHistory.push({ role: "user", content: question }, { role: "assistant", content: data.answer });
     askHistory = askHistory.slice(-8);
+    askLog.push({ role: "user", content: question }, { role: "assistant", content: data.answer });
+    if (askLog.length > 60) askLog = askLog.slice(-60);
+    saveChat(question, document.getElementById("file").files[0]);
   } catch (e) {
     pending.className = "msg err";
     pending.textContent = e.message || "Something went wrong";
