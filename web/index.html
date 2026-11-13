@@ -46,6 +46,13 @@
             <span class="sub">Summary notes and key terms</span>
           </span>
         </button>
+        <button class="tab" data-tab="ask">
+          <span class="avatar a5">A</span>
+          <span class="meta">
+            <span class="name">Ask</span>
+            <span class="sub">Explain and ask questions</span>
+          </span>
+        </button>
         <button class="tab" data-tab="history">
           <span class="avatar a4">H</span>
           <span class="meta">
@@ -128,6 +135,16 @@
             <button id="copy-notes" hidden>Copy notes</button>
           </div>
           <div id="notes"></div>
+        </section>
+
+        <section id="tab-ask" class="tab-panel" hidden>
+          <div id="chat"></div>
+          <div class="options ask-bar">
+            <input type="text" id="ask-input" placeholder="Ask a question about your material...">
+            <button id="ask-send">Ask</button>
+            <label><input type="checkbox" id="ask-general"> Allow general knowledge</label>
+            <button id="ask-clear">Clear chat</button>
+          </div>
         </section>
 
         <section id="tab-history" class="tab-panel" hidden>
