@@ -282,3 +282,26 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--red); margin-r
 .ask-bar input[type="text"] { flex: 1 1 260px; margin: 0; padding: 10px 12px; }
 .ask-bar label { margin: 0; }
 @media (max-width: 800px) { .msg { max-width: 92%; } }
+
+/* ---------- Games ---------- */
+.a6 { background: linear-gradient(135deg, #34d399, #047857); }
+#game { order: 1; flex: 1; min-height: 0; overflow-y: auto; padding-top: 20px; scrollbar-color: var(--red) transparent; }
+#game-source { max-width: 260px; }
+.game-hint { color: var(--muted); text-align: center; margin: 40px 0 0; }
+.game-stats { display: flex; gap: 24px; flex-wrap: wrap; color: var(--muted); margin-bottom: 8px; }
+.game-stats b { color: var(--text); }
+.board { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 24px; align-items: start; margin-bottom: 20px; }
+.col-tiles { display: flex; flex-direction: column; gap: 10px; }
+.tile {
+  text-align: left; padding: 12px 14px; line-height: 1.35; font-size: 0.92rem;
+  color: var(--text); background: var(--panel); border: 1px solid var(--red); border-radius: 10px;
+}
+.tile:hover { background: #1a1a1a; color: var(--text); }
+.tile.sel, .tile.sel:hover { background: var(--red); color: #fff; }
+.tile.done, .tile.done:hover { background: var(--panel); color: #22c55e; border-color: #22c55e; opacity: 0.55; cursor: default; }
+.tile.bad { animation: shake 0.4s; border-color: #f59e0b; }
+@keyframes shake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+.game-result { text-align: center; background: var(--bubble); border: 1px solid var(--red); border-radius: 14px; padding: 24px; margin-bottom: 20px; }
+.game-result h3 { margin: 0 0 8px; color: var(--red); }
+.game-result p { color: var(--muted); margin: 6px 0; }
+@media (max-width: 800px) { .tile { font-size: 0.85rem; padding: 10px; } .board { gap: 12px; } }
