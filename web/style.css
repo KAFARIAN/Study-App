@@ -305,3 +305,4 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--red); margin-r
 .game-result h3 { margin: 0 0 8px; color: var(--red); }
 .game-result p { color: var(--muted); margin: 6px 0; }
 @media (max-width: 800px) { .tile { font-size: 0.85rem; padding: 10px; } .board { gap: 12px; } }
+.h-actions { flex-wrap: wrap; justify-content: flex-end; }
