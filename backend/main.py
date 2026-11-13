@@ -1,3 +1,5 @@
+import re
+import traceback
 import time
 from datetime import datetime, timezone
 from fastapi import Depends, Header
@@ -27,6 +29,7 @@ MAX_UPLOAD = 10 * 1024 * 1024  # 10 MB
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
 DAILY_LIMIT = int(os.getenv("DAILY_LIMIT", "20"))
+ASK_DAILY_LIMIT = int(os.getenv("ASK_DAILY_LIMIT", "40"))
 REQUIRE_LOGIN = os.getenv("REQUIRE_LOGIN", "true").lower() != "false"
 
 class StudyRequest(BaseModel):
@@ -200,16 +203,22 @@ def current_user(authorization: Optional[str] = Header(None)):
 def check_and_count(user, kind):
     if not user["token"]:
         return  # login switched off for local testing
+    is_ask = kind == "ask"
+    limit = ASK_DAILY_LIMIT if is_ask else DAILY_LIMIT
     base = {"apikey": SUPABASE_ANON_KEY, "Authorization": f"Bearer {user['token']}"}
     start = datetime.now(timezone.utc).strftime("%Y-%m-%dT00:00:00Z")
     try:
-        r = requests.get(f"{SUPABASE_URL}/rest/v1/usage", headers=base, timeout=10,
-                         params={"select": "id", "created_at": f"gte.{start}"})
+        r = requests.get(
+            f"{SUPABASE_URL}/rest/v1/usage", headers=base, timeout=10,
+            params={"select": "id", "created_at": f"gte.{start}",
+                    "kind": "eq.ask" if is_ask else "neq.ask"},
+        )
         r.raise_for_status()
-        if len(r.json()) >= DAILY_LIMIT:
+        if len(r.json()) >= limit:
+            what = "questions" if is_ask else "generations"
             raise HTTPException(
                 status_code=429,
-                detail=f"Daily limit reached ({DAILY_LIMIT} generations). Please try again tomorrow.",
+                detail=f"Daily limit reached ({limit} {what}). Please try again tomorrow.",
             )
         requests.post(f"{SUPABASE_URL}/rest/v1/usage",
                       headers={**base, "Content-Type": "application/json", "Prefer": "return=minimal"},
@@ -218,7 +227,7 @@ def check_and_count(user, kind):
         raise
     except requests.exceptions.RequestException:
         raise HTTPException(status_code=503, detail="Could not check your daily limit. Please try again.")
-
+        
 def server_error(e):
     if isinstance(e, RuntimeError):  # our own friendly messages, such as "AI service is busy"
         return HTTPException(status_code=502, detail=str(e))
@@ -431,3 +440,102 @@ def notes(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# ---------------- Ask / Explain ----------------
+ASK_SCHEMA = {
+    "type": "object",
+    "properties": {"answer": {"type": "string"}},
+    "required": ["answer"],
+}
+
+STOP = set("""the a an and or of to in on for with is are was were be been it this that these those
+what why how when where who which do does did can could should would explain about me my your from
+as at by please tell give""".split())
+
+def pick_relevant(material, query, limit=9000):
+    if len(material) <= limit:
+        return material
+    size = 1500
+    chunks = [material[i:i + size] for i in range(0, len(material), size)]
+    words = {w for w in re.findall(r"[a-z0-9']+", query.lower()) if w not in STOP and len(w) > 2}
+
+    def score(c):
+        low = c.lower()
+        return sum(low.count(w) for w in words)
+
+    ranked = sorted(range(len(chunks)), key=lambda i: score(chunks[i]), reverse=True)
+    if not ranked or score(chunks[ranked[0]]) == 0:
+        return material[:limit]  # nothing matched, fall back to the start of the document
+    chosen, total = [], 0
+    for i in ranked:
+        if total + len(chunks[i]) > limit:
+            break
+        chosen.append(i)
+        total += len(chunks[i])
+    return "\n...\n".join(chunks[i] for i in sorted(chosen))
+
+def build_ask_prompt(material, question, history, general):
+    rules = (
+        "You are a patient tutor helping a student understand their study material. "
+        "Explain in simple words and give a short example when it helps.\n"
+    )
+    if general:
+        rules += ("Use the material first. If it does not cover the question, you may use general "
+                  "knowledge, and say clearly that you are going beyond the material.\n")
+    else:
+        rules += ("Answer ONLY from the material. If the material does not contain the answer, say "
+                  "that it is not covered in the material.\n")
+    rules += ("Write plain text in short paragraphs. Do not use markdown symbols such as ** or #. "
+              "Reply as JSON with a single field 'answer'.\n")
+
+    convo, earlier = "", ""
+    for m in history[-6:]:
+        if isinstance(m, dict) and m.get("role") in ("user", "assistant"):
+            content = str(m.get("content", ""))[:1500]
+            convo += ("Student: " if m["role"] == "user" else "Tutor: ") + content + "\n"
+            if m["role"] == "user":
+                earlier += " " + content
+    parts = [rules, "MATERIAL:\n" + pick_relevant(material, question + " " + earlier)]
+    if convo:
+        parts.append("CONVERSATION SO FAR:\n" + convo)
+    parts.append("STUDENT QUESTION: " + question)
+    return "\n\n".join(parts)
+
+class AskRequest(BaseModel):
+    question: str
+    material: str
+    history: list = []
+    general: bool = False
+
+@app.post("/extract")
+def extract(file: UploadFile = File(...), user: dict = Depends(current_user)):
+    try:
+        text = read_upload(file).strip()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Could not read that file.")
+    if not text:
+        raise HTTPException(status_code=400, detail="No readable text found in that file.")
+    return {"text": text[:100000]}
+
+@app.post("/ask")
+def ask(req: AskRequest, user: dict = Depends(current_user)):
+    question = req.question.strip()[:1000]
+    material = req.material.strip()[:100000]
+    if not question:
+        raise HTTPException(status_code=400, detail="Type a question first.")
+    if not material:
+        raise HTTPException(status_code=400, detail="Add some material first (paste text or attach a file).")
+    check_and_count(user, "ask")  # only counts valid questions
+    try:
+        data = call_model(build_ask_prompt(material, question, req.history, req.general), ASK_SCHEMA)
+        answer = str(data.get("answer", "")).strip()
+        if not answer:
+            raise RuntimeError("The AI returned an empty answer. Please try again.")
+        return {"answer": answer}
+    except RuntimeError as e:  # friendly messages from call_model
+        raise HTTPException(status_code=502, detail=str(e))
+    except Exception:
+        traceback.print_exc()  # real details stay in the server log
+        raise HTTPException(status_code=500, detail="Something went wrong on our side. Please try again.")
