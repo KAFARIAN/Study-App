@@ -267,3 +267,18 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--red); margin-r
   .tab { padding: 6px 8px; }
   .tab .name { font-size: 0.85rem; }
 }
+/* ---------- Ask / Explain ---------- */
+.a5 { background: linear-gradient(135deg, #fbbf24, #b45309); }
+#chat {
+  order: 1; flex: 1; min-height: 0; overflow-y: auto; padding-top: 20px;
+  display: flex; flex-direction: column; gap: 12px; scrollbar-color: var(--red) transparent;
+}
+.msg { max-width: 85%; padding: 12px 14px; border-radius: 14px; white-space: pre-wrap; line-height: 1.5; }
+.msg.user { align-self: flex-end; background: var(--red); color: #fff; border-bottom-right-radius: 4px; }
+.msg.bot { align-self: flex-start; background: var(--bubble); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+.msg.pending { color: var(--muted); }
+.msg.err { align-self: flex-start; color: var(--red); border: 1px solid var(--red); }
+.chat-hint { color: var(--muted); text-align: center; margin: auto; }
+.ask-bar input[type="text"] { flex: 1 1 260px; margin: 0; padding: 10px 12px; }
+.ask-bar label { margin: 0; }
+@media (max-width: 800px) { .msg { max-width: 92%; } }
