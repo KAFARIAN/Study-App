@@ -541,7 +541,7 @@ function renderHistory() {
     const del = document.createElement("button");
     del.textContent = "Delete";
     del.addEventListener("click", () => { deleteHistory(h.id); renderHistory(); });
-    actions.append(open, del);
+     actions.append(open, ...exportButtons(h), del);
 
     row.append(info, actions);
     box.appendChild(row);
@@ -935,3 +935,132 @@ function endRound() {
 }
 
 document.getElementById("game-start").addEventListener("click", startMatch);
+// ---- Export ----
+const esc = (s) =>
+  String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+function safeName(title) {
+  return (title || "study").replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-").slice(0, 40) || "study";
+}
+
+function downloadFile(name, text, type) {
+  const blob = new Blob([text], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// opens the browser's print window; choose "Save as PDF" there
+function printHtml(title, bodyHtml) {
+  const f = document.createElement("iframe");
+  f.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;";
+  document.body.appendChild(f);
+  const doc = f.contentWindow.document;
+  doc.open();
+  doc.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title>
+    <style>
+      body { font-family: Arial, sans-serif; color: #111; margin: 24px; line-height: 1.45; }
+      h1 { font-size: 20px; margin-bottom: 4px; } h2 { font-size: 16px; margin-top: 20px; }
+      .q { margin: 14px 0; } .opt { margin-left: 18px; } .key { page-break-before: always; }
+      th, td { text-align: left; vertical-align: top; }
+    </style></head><body>${bodyHtml}</body></html>`);
+  doc.close();
+  f.contentWindow.focus();
+  setTimeout(() => {
+    f.contentWindow.print();
+    setTimeout(() => f.remove(), 60000);
+  }, 300);
+}
+
+function csvCell(v) {
+  let s = String(v);
+  if (/^[=+@]|^-[^\d.]/.test(s)) s = "'" + s; // stops spreadsheets running a cell as a formula
+  return `"${s.replace(/"/g, '""')}"`;
+}
+
+function flashcardsCsv(cards) {
+  return "\uFEFF" + cards.map((c) => `${csvCell(c.q)},${csvCell(c.a)}`).join("\r\n");
+}
+
+function flashcardsHtml(h) {
+  const rows = h.data
+    .map((c, i) => `<tr><td>${i + 1}</td><td>${esc(c.q)}</td><td>${esc(c.a)}</td></tr>`)
+    .join("");
+  return `<h1>${esc(h.title)}</h1><p>Flashcards</p>
+    <table border="1" cellspacing="0" cellpadding="8" style="border-collapse:collapse;width:100%">
+    <tr><th>#</th><th>Question</th><th>Answer</th></tr>${rows}</table>`;
+}
+
+function quizHtml(h) {
+  const letters = "ABCDEFGH";
+  const qs = h.data
+    .map((q, i) => {
+      let body;
+      if (q.type === "mcq") body = q.options.map((o, k) => `<div class="opt">${letters[k]}. ${esc(o)}</div>`).join("");
+      else if (q.type === "tf") body = `<div class="opt">True &nbsp;&nbsp;&nbsp; False</div>`;
+      else body = `<div class="opt">Answer: ____________________</div>`;
+      return `<div class="q"><b>${i + 1}.</b> ${esc(q.question)}${body}</div>`;
+    })
+    .join("");
+  const key = h.data
+    .map((q, i) => `<div class="q"><b>${i + 1}.</b> ${esc(q.answer)}${q.explanation ? " &ndash; " + esc(q.explanation) : ""}</div>`)
+    .join("");
+  return `<h1>${esc(h.title)}</h1><p>Quiz</p>${qs}<div class="key"><h2>Answer key</h2>${key}</div>`;
+}
+
+function notesText(d) {
+  let out = "";
+  d.sections.forEach((s) => {
+    out += s.heading + "\n" + s.points.map((p) => "- " + p).join("\n") + "\n\n";
+  });
+  if (d.key_terms.length) out += "Key terms\n" + d.key_terms.map((t) => `${t.term}: ${t.meaning}`).join("\n") + "\n";
+  return out.trim() + "\n";
+}
+
+function notesHtml(h) {
+  const secs = h.data.sections
+    .map((s) => `<h2>${esc(s.heading)}</h2><ul>${s.points.map((p) => `<li>${esc(p)}</li>`).join("")}</ul>`)
+    .join("");
+  const terms = h.data.key_terms.length
+    ? "<h2>Key terms</h2>" + h.data.key_terms.map((t) => `<p><b>${esc(t.term)}:</b> ${esc(t.meaning)}</p>`).join("")
+    : "";
+  return `<h1>${esc(h.title)}</h1><p>Study notes</p>${secs}${terms}`;
+}
+
+function chatText(msgs) {
+  return msgs.map((m) => (m.role === "user" ? "Student: " : "Tutor: ") + m.content).join("\n\n") + "\n";
+}
+
+function exportButtons(h) {
+  const make = (label, fn) => {
+    const b = document.createElement("button");
+    b.textContent = label;
+    b.addEventListener("click", fn);
+    return b;
+  };
+  const name = safeName(h.title);
+  if (h.type === "flashcards") {
+    return [
+      make("CSV", () => downloadFile(`${name}-flashcards.csv`, flashcardsCsv(h.data), "text/csv;charset=utf-8")),
+      make("Print/PDF", () => printHtml(h.title, flashcardsHtml(h))),
+    ];
+  }
+  if (h.type === "quiz") {
+    return [make("Print/PDF", () => printHtml(h.title, quizHtml(h)))];
+  }
+  if (h.type === "notes") {
+    return [
+      make(".txt", () => downloadFile(`${name}-notes.txt`, notesText(h.data), "text/plain;charset=utf-8")),
+      make("Print/PDF", () => printHtml(h.title, notesHtml(h))),
+    ];
+  }
+  if (h.type === "ask") {
+    return [make(".txt", () => downloadFile(`${name}-chat.txt`, chatText(h.data), "text/plain;charset=utf-8"))];
+  }
+  return [];
+}
