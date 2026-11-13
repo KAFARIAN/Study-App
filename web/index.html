@@ -23,7 +23,6 @@
   <div class="app">
     <aside class="sidebar">
       <div class="side-top">Study App</div>
-
       <nav class="chat-list">
         <button class="tab active" data-tab="flashcards">
           <span class="avatar a1">F</span>
@@ -53,6 +52,13 @@
             <span class="sub">Explain and ask questions</span>
           </span>
         </button>
+        <button class="tab" data-tab="games">
+          <span class="avatar a6">G</span>
+          <span class="meta">
+            <span class="name">Games</span>
+            <span class="sub">Practice with your flashcards</span>
+          </span>
+        </button>
         <button class="tab" data-tab="history">
           <span class="avatar a4">H</span>
           <span class="meta">
@@ -61,7 +67,6 @@
           </span>
         </button>
       </nav>
-
       <div class="side-foot">
         <div class="account" id="account" hidden>
           <span id="account-email"></span>
@@ -71,7 +76,6 @@
         <p id="out"></p>
       </div>
     </aside>
-
     <section class="main">
       <header class="main-head">
         <div id="head-avatar" class="avatar a1">F</div>
@@ -95,9 +99,7 @@
           </div>
         </div>
       </div>
-
       <div class="messages">
-
         <section id="tab-flashcards" class="tab-panel">
           <div class="options">
             <label>Number of cards <input type="number" id="count" value="5" min="1" max="20"></label>
@@ -107,7 +109,6 @@
           </div>
           <div id="cards"></div>
         </section>
-
         <section id="tab-quiz" class="tab-panel" hidden>
           <div class="options">
             <div class="types">
@@ -121,7 +122,6 @@
           </div>
           <div id="quiz"></div>
         </section>
-
         <section id="tab-notes" class="tab-panel" hidden>
           <div class="options">
             <label>Detail level
@@ -136,7 +136,6 @@
           </div>
           <div id="notes"></div>
         </section>
-
         <section id="tab-ask" class="tab-panel" hidden>
           <div id="chat"></div>
           <div class="options ask-bar">
@@ -146,7 +145,21 @@
             <button id="ask-clear">Clear chat</button>
           </div>
         </section>
-
+        <section id="tab-games" class="tab-panel" hidden>
+          <div id="game"></div>
+          <div class="options">
+            <label>Flashcard set <select id="game-source"></select></label>
+            <label>Pairs per round
+              <select id="game-size">
+                <option value="4">4</option>
+                <option value="6" selected>6</option>
+                <option value="8">8</option>
+              </select>
+            </label>
+            <label><input type="checkbox" id="game-learning"> Only "still learning" cards</label>
+            <button id="game-start" class="gen">Start matching game</button>
+          </div>
+        </section>
         <section id="tab-history" class="tab-panel" hidden>
           <div id="history-list"></div>
           <div class="options">
@@ -163,9 +176,7 @@
           </div>
         </section>
       </div>
-
     </section>
-
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
