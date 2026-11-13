@@ -514,7 +514,7 @@ function renderHistory() {
   const box = document.getElementById("history-list");
   const filter = document.getElementById("history-filter").value;
   const items = loadHistory().filter((h) => filter === "all" || h.type === filter);
-  const labels = { flashcards: "Flashcards", quiz: "Quiz", notes: "Notes" };
+    const labels = { flashcards: "Flashcards", quiz: "Quiz", notes: "Notes", ask: "Ask" };
   box.innerHTML = "";
   if (!items.length) {
     box.textContent = "Nothing here yet. Generate flashcards, a quiz or notes and they will be saved here.";
@@ -554,6 +554,8 @@ function openHistory(h) {
     renderCards(h.data, document.getElementById("cards"), h.id);
   } else if (h.type === "quiz") {
     renderQuiz(h.data, document.getElementById("quiz"), h.id);
+  } else if (h.type === "ask") {
+    loadChat(h);
   } else {
     lastNotes = h.data;
     renderNotes(h.data, document.getElementById("notes"));
