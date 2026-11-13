@@ -503,6 +503,10 @@ function historySummary(h) {
     const best = (h.attempts || []).reduce((m, a) => Math.max(m, a.pct), -1);
     return `${h.data.length} questions` + (best >= 0 ? `, best score ${best}%` : ", not taken yet");
   }
+  if (h.type === "ask") {
+    const n = Math.ceil(h.data.length / 2);
+    return `${n} question${n === 1 ? "" : "s"}`;
+  }
   return `${h.data.sections.length} sections`;
 }
 
