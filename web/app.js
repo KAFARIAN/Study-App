@@ -541,7 +541,7 @@ function renderHistory() {
     const del = document.createElement("button");
     del.textContent = "Delete";
     del.addEventListener("click", () => { deleteHistory(h.id); renderHistory(); });
-     actions.append(open, ...exportButtons(h), del);
+    actions.append(open, ...exportButtons(h), del);
 
     row.append(info, actions);
     box.appendChild(row);
