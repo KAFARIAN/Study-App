@@ -578,3 +578,106 @@ async function authHeaders(extra) {
   const token = await getToken();
   return { ...(extra || {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) };
 }
+// ---- Ask / Explain ----
+let askSource = "";    // describes the material the current conversation is about
+let askHistory = [];   // [{ role: "user" | "assistant", content }]
+const fileCache = {};  // file key -> extracted text, so a file is only read once
+const chatBox = document.getElementById("chat");
+
+function chatHint() {
+  chatBox.innerHTML = "";
+  const p = document.createElement("p");
+  p.className = "chat-hint";
+  p.textContent = "Add your material above, then ask a question about it.";
+  chatBox.appendChild(p);
+}
+chatHint();
+
+function askReset() {
+  askHistory = [];
+  askSource = "";
+  Object.keys(fileCache).forEach((k) => delete fileCache[k]);
+  chatHint();
+}
+
+function addMsg(kind, text) {
+  const hint = chatBox.querySelector(".chat-hint");
+  if (hint) hint.remove();
+  const el = document.createElement("div");
+  el.className = `msg ${kind}`;
+  el.textContent = text;
+  chatBox.appendChild(el);
+  chatBox.scrollTop = chatBox.scrollHeight;
+  return el;
+}
+
+async function getAskMaterial() {
+  const file = document.getElementById("file").files[0];
+  if (file) {
+    const key = `f:${file.name}:${file.size}:${file.lastModified}`;
+    if (!fileCache[key]) {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch(`${API}/extract`, { method: "POST", headers: await authHeaders(), body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Could not read the file.");
+      fileCache[key] = data.text;
+    }
+    return { key, text: fileCache[key] };
+  }
+  const text = document.getElementById("material").value.trim();
+  return { key: "t:" + text, text };
+}
+
+async function sendAsk() {
+  const input = document.getElementById("ask-input");
+  const btn = document.getElementById("ask-send");
+  const question = input.value.trim();
+  if (!question) return;
+  if (!document.getElementById("material").value.trim() && !document.getElementById("file").files[0]) {
+    addMsg("err", "Add some material first: paste text above or attach a file.");
+    return;
+  }
+  input.value = "";
+  btn.disabled = true;
+  addMsg("user", question);
+  const pending = addMsg("bot pending", "Thinking...");
+  try {
+    const m = await getAskMaterial();
+    if (m.key !== askSource) { // new material means a new conversation
+      askSource = m.key;
+      askHistory = [];
+    }
+    const res = await fetch(`${API}/ask`, {
+      method: "POST",
+      headers: await authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({
+        question,
+        material: m.text,
+        history: askHistory,
+        general: document.getElementById("ask-general").checked,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Request failed");
+    pending.className = "msg bot";
+    pending.textContent = data.answer;
+    askHistory.push({ role: "user", content: question }, { role: "assistant", content: data.answer });
+    askHistory = askHistory.slice(-8);
+  } catch (e) {
+    pending.className = "msg err";
+    pending.textContent = e.message || "Something went wrong";
+  } finally {
+    btn.disabled = false;
+    input.focus();
+  }
+}
+
+document.getElementById("ask-send").addEventListener("click", sendAsk);
+document.getElementById("ask-input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    sendAsk();
+  }
+});
+document.getElementById("ask-clear").addEventListener("click", askReset);
