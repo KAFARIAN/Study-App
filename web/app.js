@@ -571,12 +571,13 @@ document.getElementById("clear-history").addEventListener("click", () => {
   }
 });
 
-// refresh the list when the History tab opens, and hide the material box there
+// refresh lists when History or Games opens, and hide the material box there
 document.querySelectorAll(".tab").forEach((btn) => {
   btn.addEventListener("click", () => {
-    const isHistory = btn.dataset.tab === "history";
-    document.querySelector(".composer").hidden = isHistory;
-    if (isHistory) renderHistory();
+    const t = btn.dataset.tab;
+    document.querySelector(".composer").hidden = t === "history" || t === "games";
+    if (t === "history") renderHistory();
+    if (t === "games") fillGameSources();
   });
 });
 
@@ -724,3 +725,213 @@ document.getElementById("ask-input").addEventListener("keydown", (e) => {
   }
 });
 document.getElementById("ask-clear").addEventListener("click", askReset);
+
+// ---- Games: matching ----
+const gameBox = document.getElementById("game");
+let matchGame = null;
+let gameTimer = null;
+
+function shuffle(a) {
+  const b = a.slice();
+  for (let i = b.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [b[i], b[j]] = [b[j], b[i]];
+  }
+  return b;
+}
+
+function gameHint(text) {
+  gameBox.innerHTML = "";
+  const p = document.createElement("p");
+  p.className = "game-hint";
+  p.textContent = text || "Pick a flashcard set below and press Start.";
+  gameBox.appendChild(p);
+}
+gameHint();
+
+function gameReset() {
+  clearInterval(gameTimer);
+  matchGame = null;
+  gameHint();
+}
+
+function flashcardSets() {
+  return loadHistory().filter((h) => h.type === "flashcards" && Array.isArray(h.data) && h.data.length >= 3);
+}
+
+function fillGameSources() {
+  const sel = document.getElementById("game-source");
+  const sets = flashcardSets();
+  sel.innerHTML = "";
+  if (!sets.length) {
+    const o = document.createElement("option");
+    o.value = "";
+    o.textContent = "No flashcard sets yet";
+    sel.appendChild(o);
+    return;
+  }
+  sets.forEach((h) => {
+    const o = document.createElement("option");
+    o.value = h.id;
+    o.textContent = `${h.title} (${h.data.length} cards)`;
+    sel.appendChild(o);
+  });
+}
+
+function makeRounds(pool, size) {
+  const rounds = [];
+  for (let i = 0; i < pool.length; i += size) rounds.push(pool.slice(i, i + size));
+  if (rounds.length > 1 && rounds[rounds.length - 1].length < 3) {
+    const last = rounds.pop(); // a tiny last round is merged into the one before it
+    rounds[rounds.length - 1] = rounds[rounds.length - 1].concat(last);
+  }
+  return rounds;
+}
+
+function startMatch() {
+  clearInterval(gameTimer);
+  const set = flashcardSets().find((h) => h.id === document.getElementById("game-source").value);
+  if (!set) {
+    gameHint("Generate some flashcards first (a set needs at least 3 cards), then come back to play.");
+    return;
+  }
+  const size = Number(document.getElementById("game-size").value) || 6;
+  const learningOnly = document.getElementById("game-learning").checked;
+  const cards = set.data
+    .filter((c) => !learningOnly || c.s === "learning")
+    .map((c) => ({ q: c.q, a: c.a }));
+  if (cards.length < 3) {
+    gameHint('Not enough cards marked "still learning" in this set. Mark some in the Flashcards study mode first.');
+    return;
+  }
+  matchGame = { rounds: makeRounds(shuffle(cards), size), round: 0, totalTime: 0, totalMistakes: 0, totalPairs: 0 };
+  startRound();
+}
+
+function startRound() {
+  clearInterval(gameTimer);
+  const g = matchGame;
+  g.pairs = g.rounds[g.round].map((c, i) => ({ id: String(i), q: c.q, a: c.a }));
+  g.matched = 0;
+  g.mistakes = 0;
+  g.selected = null;
+  g.start = Date.now();
+
+  gameBox.innerHTML = "";
+  const stats = document.createElement("div");
+  stats.className = "game-stats";
+  stats.innerHTML = `<span>Round <b>${g.round + 1}</b> of <b>${g.rounds.length}</b></span>
+    <span>Matched <b id="game-progress">0/${g.pairs.length}</b></span>
+    <span>Time <b id="game-time">0s</b></span>
+    <span>Mistakes <b id="game-mistakes">0</b></span>`;
+  const hint = document.createElement("p");
+  hint.className = "game-hint";
+  hint.style.margin = "0 0 14px";
+  hint.style.textAlign = "left";
+  hint.textContent = "Tap a question, then tap the answer that belongs to it.";
+
+  const board = document.createElement("div");
+  board.className = "board";
+  const makeCol = (side, items) => {
+    const col = document.createElement("div");
+    col.className = "col-tiles";
+    items.forEach((p) => {
+      const t = document.createElement("button");
+      t.className = "tile";
+      t.dataset.id = p.id;
+      t.dataset.side = side;
+      t.textContent = side === "q" ? p.q : p.a;
+      t.addEventListener("click", () => onTile(t));
+      col.appendChild(t);
+    });
+    return col;
+  };
+  board.append(makeCol("q", shuffle(g.pairs)), makeCol("a", shuffle(g.pairs)));
+  gameBox.append(stats, hint, board);
+  gameTimer = setInterval(updateStats, 1000);
+}
+
+function updateStats() {
+  const g = matchGame;
+  if (!g) return;
+  const t = document.getElementById("game-time");
+  const m = document.getElementById("game-mistakes");
+  const p = document.getElementById("game-progress");
+  if (t) t.textContent = Math.round((Date.now() - g.start) / 1000) + "s";
+  if (m) m.textContent = g.mistakes;
+  if (p) p.textContent = `${g.matched}/${g.pairs.length}`;
+}
+
+function onTile(el) {
+  const g = matchGame;
+  if (!g || el.classList.contains("done")) return;
+  if (!g.selected) {
+    g.selected = el;
+    el.classList.add("sel");
+    return;
+  }
+  if (g.selected.dataset.side === el.dataset.side) { // same column: just change the selection
+    g.selected.classList.remove("sel");
+    g.selected = el;
+    el.classList.add("sel");
+    return;
+  }
+  const first = g.selected;
+  g.selected = null;
+  first.classList.remove("sel");
+  if (first.dataset.id === el.dataset.id) {
+    first.classList.add("done");
+    el.classList.add("done");
+    g.matched++;
+    updateStats();
+    if (g.matched === g.pairs.length) endRound();
+  } else {
+    g.mistakes++;
+    updateStats();
+    first.classList.add("bad");
+    el.classList.add("bad");
+    setTimeout(() => {
+      first.classList.remove("bad");
+      el.classList.remove("bad");
+    }, 450);
+  }
+}
+
+function endRound() {
+  const g = matchGame;
+  clearInterval(gameTimer);
+  const secs = Math.round((Date.now() - g.start) / 1000);
+  g.totalTime += secs;
+  g.totalMistakes += g.mistakes;
+  g.totalPairs += g.pairs.length;
+  const last = g.round === g.rounds.length - 1;
+  const pct = (pairs, mistakes) => Math.round((pairs / (pairs + mistakes)) * 100);
+
+  const box = document.createElement("div");
+  box.className = "game-result";
+  const h = document.createElement("h3");
+  h.textContent = last ? "Game complete" : `Round ${g.round + 1} complete`;
+  const p1 = document.createElement("p");
+  p1.textContent = `This round: ${secs}s, ${g.mistakes} mistake${g.mistakes === 1 ? "" : "s"}, ${pct(g.pairs.length, g.mistakes)}% accuracy.`;
+  box.append(h, p1);
+  if (last && g.rounds.length > 1) {
+    const p2 = document.createElement("p");
+    p2.textContent = `Overall: ${g.totalTime}s, ${g.totalMistakes} mistake${g.totalMistakes === 1 ? "" : "s"}, ${pct(g.totalPairs, g.totalMistakes)}% accuracy.`;
+    box.appendChild(p2);
+  }
+  const btn = document.createElement("button");
+  btn.textContent = last ? "Play again" : "Next round";
+  btn.addEventListener("click", () => {
+    if (last) {
+      startMatch();
+    } else {
+      g.round++;
+      startRound();
+    }
+  });
+  box.appendChild(btn);
+  gameBox.appendChild(box);
+  box.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+document.getElementById("game-start").addEventListener("click", startMatch);
