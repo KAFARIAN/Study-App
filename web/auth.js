@@ -23,7 +23,7 @@ function applySession(session) {
     startHistory(uid);
   } else {
     stopHistory();
-    ["cards", "quiz", "notes", "history-list"].forEach((id) => {
+    ["cards", "quiz", "notes", "history-list", "progress-box"].forEach((id) => {
       document.getElementById(id).innerHTML = "";
     });
     askReset(); // clear the chat and any cached file text
@@ -74,3 +74,36 @@ document.getElementById("auth-signup").addEventListener("click", async () => {
 });
 
 document.getElementById("signout").addEventListener("click", () => sb.auth.signOut());
+// ---- Account: delete ----
+const acctDialog = document.getElementById("account-dialog");
+const acctMsg = document.getElementById("acct-msg");
+
+document.getElementById("account-open").addEventListener("click", () => {
+  document.getElementById("acct-email").textContent = document.getElementById("account-email").textContent;
+  document.getElementById("acct-confirm").value = "";
+  acctMsg.textContent = "";
+  acctDialog.hidden = false;
+});
+
+document.getElementById("acct-close").addEventListener("click", () => {
+  acctDialog.hidden = true;
+});
+
+document.getElementById("acct-delete").addEventListener("click", async () => {
+  if (document.getElementById("acct-confirm").value.trim() !== "DELETE") {
+    acctMsg.className = "auth-msg";
+    acctMsg.textContent = "Type DELETE in capital letters to confirm.";
+    return;
+  }
+  acctMsg.className = "auth-msg ok";
+  acctMsg.textContent = "Deleting...";
+  const { error } = await sb.rpc("delete_my_account");
+  if (error) {
+    acctMsg.className = "auth-msg";
+    acctMsg.textContent = "Could not delete the account: " + error.message;
+    return;
+  }
+  await sb.auth.signOut({ scope: "local" }); // clears the saved login on this device
+  acctDialog.hidden = true;
+  showMsg("Your account and its data have been deleted.", true);
+});
