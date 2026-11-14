@@ -316,3 +316,13 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--red); margin-r
 .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
 .mastery { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
 @media (max-width: 800px) { .kpis-4 { grid-template-columns: repeat(2, 1fr); } }
+/* keep report charts inside their box on narrow screens */
+.report { min-width: 0; overflow: hidden; }
+.report-charts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.chart { min-width: 0; overflow: hidden; }
+.cols { gap: 4px; }
+.col { min-width: 0; }
+#progress-box { overflow-x: hidden; }
+@media (max-width: 800px) {
+  .report-charts { grid-template-columns: minmax(0, 1fr); }
+}
