@@ -306,3 +306,13 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--red); margin-r
 .game-result p { color: var(--muted); margin: 6px 0; }
 @media (max-width: 800px) { .tile { font-size: 0.85rem; padding: 10px; } .board { gap: 12px; } }
 .h-actions { flex-wrap: wrap; justify-content: flex-end; }
+/* ---------- Progress ---------- */
+.a7 { background: linear-gradient(135deg, #60a5fa, #1d4ed8); }
+#progress-box { order: 1; flex: 1; min-height: 0; overflow-y: auto; padding-top: 20px; scrollbar-color: var(--red) transparent; }
+.kpis-4 { grid-template-columns: repeat(4, 1fr); min-width: 0; margin-bottom: 16px; }
+.line-chart { width: 100%; height: auto; }
+.bar-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; color: var(--muted); font-size: 0.8rem; margin-top: 8px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+.mastery { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+@media (max-width: 800px) { .kpis-4 { grid-template-columns: repeat(2, 1fr); } }
