@@ -571,13 +571,14 @@ document.getElementById("clear-history").addEventListener("click", () => {
   }
 });
 
-// refresh lists when History or Games opens, and hide the material box there
+// refresh lists when History, Games or Progress opens, and hide the material box there
 document.querySelectorAll(".tab").forEach((btn) => {
   btn.addEventListener("click", () => {
     const t = btn.dataset.tab;
-    document.querySelector(".composer").hidden = t === "history" || t === "games";
+    document.querySelector(".composer").hidden = ["history", "games", "progress"].includes(t);
     if (t === "history") renderHistory();
     if (t === "games") fillGameSources();
+    if (t === "progress") renderProgress();
   });
 });
 
@@ -1046,7 +1047,6 @@ function exportButtons(h) {
   const name = safeName(h.title);
   if (h.type === "flashcards") {
     return [
-      make("CSV", () => downloadFile(`${name}-flashcards.csv`, flashcardsCsv(h.data), "text/csv;charset=utf-8")),
       make("Print/PDF", () => printHtml(h.title, flashcardsHtml(h))),
     ];
   }
@@ -1064,3 +1064,150 @@ function exportButtons(h) {
   }
   return [];
 }
+// ---- Progress dashboard ----
+const dayKey = (d) => new Date(d).toLocaleDateString("en-CA"); // YYYY-MM-DD in the user's own time zone
+
+function lineChart(points) {
+  const W = 600, H = 220, L = 36, R = 12, T = 12, B = 28;
+  const n = points.length;
+  const x = (i) => L + (n === 1 ? (W - L - R) / 2 : (i * (W - L - R)) / (n - 1));
+  const y = (v) => T + ((100 - v) * (H - T - B)) / 100;
+  const path = points.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p.pct).toFixed(1)}`).join(" ");
+  const dots = points.map((p, i) =>
+    `<circle cx="${x(i).toFixed(1)}" cy="${y(p.pct).toFixed(1)}" r="4" fill="#e11d2e">` +
+    `<title>${esc(p.title)}: ${p.pct}% on ${esc(new Date(p.ts).toLocaleDateString())}</title></circle>`).join("");
+  const grid = [0, 50, 100].map((v) =>
+    `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="#2a2a2a"/>` +
+    `<text x="${L - 6}" y="${y(v) + 4}" text-anchor="end" fill="#8a8a8a" font-size="11">${v}%</text>`).join("");
+  const first = new Date(points[0].ts).toLocaleDateString();
+  const last = new Date(points[n - 1].ts).toLocaleDateString();
+  return `<svg viewBox="0 0 ${W} ${H}" class="line-chart">${grid}
+    <path d="${path}" fill="none" stroke="#e11d2e" stroke-width="2"/>${dots}
+    <text x="${L}" y="${H - 8}" fill="#8a8a8a" font-size="11">${esc(first)}</text>
+    <text x="${W - R}" y="${H - 8}" text-anchor="end" fill="#8a8a8a" font-size="11">${esc(last)}</text></svg>`;
+}
+
+function masteryDonut(known, learning, fresh) {
+  const total = known + learning + fresh;
+  const R = 54, C = 2 * Math.PI * R;
+  let offset = 0;
+  const seg = (n, color) => {
+    const len = (C * n) / total;
+    const s = `<circle cx="70" cy="70" r="${R}" fill="none" stroke="${color}" stroke-width="16"
+      stroke-dasharray="${len} ${C - len}" stroke-dashoffset="${-offset}" transform="rotate(-90 70 70)"/>`;
+    offset += len;
+    return s;
+  };
+  const pct = Math.round((known / total) * 100);
+  return `<svg viewBox="0 0 140 140" class="donut">${seg(known, "#22c55e")}${seg(learning, "#f59e0b")}${seg(fresh, "#3a3a3a")}
+    <text x="70" y="68" text-anchor="middle" class="donut-pct">${pct}%</text>
+    <text x="70" y="88" text-anchor="middle" class="donut-sub">mastered</text></svg>`;
+}
+
+function renderProgress() {
+  const box = document.getElementById("progress-box");
+  const range = document.getElementById("progress-range").value;
+  const items = loadHistory();
+  const cutoff = range === "all" ? 0 : Date.now() - Number(range) * 86400000;
+  const avgOf = (arr) => Math.round(arr.reduce((s, a) => s + a.pct, 0) / arr.length);
+
+  // every quiz attempt, with the title of its quiz
+  const attempts = [];
+  items.filter((h) => h.type === "quiz").forEach((h) => {
+    (h.attempts || []).forEach((a) => attempts.push({ ...a, title: h.title, ts: new Date(a.date).getTime() }));
+  });
+  attempts.sort((a, b) => a.ts - b.ts);
+  const shown = attempts.filter((a) => a.ts >= cutoff);
+
+  // days with activity: things created plus quiz attempts
+  const activity = {};
+  const mark = (iso) => { const k = dayKey(iso); activity[k] = (activity[k] || 0) + 1; };
+  items.forEach((h) => mark(h.date));
+  attempts.forEach((a) => mark(a.date));
+  let streak = 0;
+  const d = new Date();
+  if (!activity[dayKey(d)]) d.setDate(d.getDate() - 1); // no activity yet today does not break the streak
+  while (activity[dayKey(d)]) { streak++; d.setDate(d.getDate() - 1); }
+
+  // average score by quiz
+  const byQuiz = {};
+  shown.forEach((a) => { (byQuiz[a.title] = byQuiz[a.title] || []).push(a); });
+  const rows = Object.entries(byQuiz)
+    .map(([title, arr]) => ({ title, avg: avgOf(arr), n: arr.length, last: arr[arr.length - 1].ts }))
+    .sort((a, b) => b.last - a.last)
+    .slice(0, 8);
+  const bars = rows.map((r) => `
+    <div class="bar-row">
+      <span class="bar-label" title="${esc(r.title)}">${esc(r.title)}</span>
+      <div class="bar"><div class="bar-fill" style="width:${r.avg}%"></div></div>
+      <span class="bar-val">${r.avg}% (${r.n}x)</span>
+    </div>`).join("");
+
+  // flashcard mastery across all sets (card marks have no dates, so this ignores the range)
+  let known = 0, learning = 0, fresh = 0;
+  items.filter((h) => h.type === "flashcards" && Array.isArray(h.data)).forEach((h) => {
+    h.data.forEach((c) => { if (c.s === "known") known++; else if (c.s === "learning") learning++; else fresh++; });
+  });
+
+  // activity for the last 14 days
+  const days = [];
+  for (let i = 13; i >= 0; i--) { const dd = new Date(); dd.setDate(dd.getDate() - i); days.push(dayKey(dd)); }
+  const maxA = Math.max(...days.map((k) => activity[k] || 0), 1);
+  const cols = days.map((k) => `
+    <div class="col" title="${esc(k)}: ${activity[k] || 0}">
+      <div class="col-bar ok" style="height:${Math.max(4, ((activity[k] || 0) / maxA) * 100)}%"></div>
+      <span class="col-label">${esc(k.slice(8))}</span>
+    </div>`).join("");
+
+  // written insights
+  const insights = [];
+  if (shown.length >= 4) {
+    const half = Math.floor(shown.length / 2);
+    const early = avgOf(shown.slice(0, half)), late = avgOf(shown.slice(half));
+    insights.push(late > early
+      ? `Your scores are improving: about ${early}% earlier and ${late}% more recently.`
+      : late < early
+        ? `Your recent scores (${late}%) are lower than your earlier ones (${early}%). Reviewing the cards you find hard may help.`
+        : `Your scores are steady at about ${late}%.`);
+  } else if (shown.length) {
+    insights.push("Take a few more quizzes to see a trend.");
+  } else {
+    insights.push("No quiz results in this period yet. Open a saved quiz from History and take it to start tracking.");
+  }
+  if (rows.length > 1) {
+    const sorted = rows.slice().sort((a, b) => b.avg - a.avg);
+    if (sorted[0].avg !== sorted[sorted.length - 1].avg) {
+      insights.push(`Your strongest quiz is "${esc(sorted[0].title)}" (${sorted[0].avg}%) and your weakest is "${esc(sorted[sorted.length - 1].title)}" (${sorted[sorted.length - 1].avg}%).`);
+    }
+  }
+  if (learning > 0) {
+    insights.push(`You have ${learning} flashcard${learning === 1 ? "" : "s"} marked "still learning". Try the matching game with only those cards.`);
+  }
+  if (streak >= 2) insights.push(`You have been active ${streak} days in a row. Keep it going!`);
+
+  box.innerHTML = `
+    <div class="report">
+      <h3>Your progress</h3>
+      <div class="kpis kpis-4">
+        <div class="kpi"><b>${shown.length}</b><span>Quiz attempts</span></div>
+        <div class="kpi"><b>${shown.length ? avgOf(shown) + "%" : "-"}</b><span>Average score</span></div>
+        <div class="kpi"><b>${shown.length ? Math.max(...shown.map((a) => a.pct)) + "%" : "-"}</b><span>Best score</span></div>
+        <div class="kpi"><b>${streak}</b><span>Day streak</span></div>
+      </div>
+      <div class="report-charts">
+        <div class="chart"><h4>Quiz scores over time</h4>${shown.length ? lineChart(shown.slice(-30)) : "<p class='empty'>No quiz attempts yet.</p>"}</div>
+        <div class="chart"><h4>Average score by quiz</h4>${bars || "<p class='empty'>No quiz attempts yet.</p>"}</div>
+        <div class="chart"><h4>Flashcard mastery</h4>${known + learning + fresh
+          ? `<div class="mastery">${masteryDonut(known, learning, fresh)}<div class="legend">
+              <span><i style="background:#22c55e"></i>Got it: ${known}</span>
+              <span><i style="background:#f59e0b"></i>Still learning: ${learning}</span>
+              <span><i style="background:#3a3a3a"></i>New: ${fresh}</span></div></div>`
+          : "<p class='empty'>No flashcard sets yet.</p>"}</div>
+        <div class="chart"><h4>Activity, last 14 days</h4><div class="cols">${cols}</div></div>
+      </div>
+      <h4>What this means</h4>
+      <ul class="insights">${insights.map((s) => `<li>${s}</li>`).join("")}</ul>
+    </div>`;
+}
+
+document.getElementById("progress-range").addEventListener("change", renderProgress);
