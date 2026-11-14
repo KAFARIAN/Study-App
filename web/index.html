@@ -59,6 +59,13 @@
             <span class="sub">Practice with your flashcards</span>
           </span>
         </button>
+        <button class="tab" data-tab="progress">
+          <span class="avatar a7">P</span>
+          <span class="meta">
+            <span class="name">Progress</span>
+            <span class="sub">Scores, streaks and mastery</span>
+          </span>
+        </button>
         <button class="tab" data-tab="history">
           <span class="avatar a4">H</span>
           <span class="meta">
@@ -158,6 +165,18 @@
             </label>
             <label><input type="checkbox" id="game-learning"> Only "still learning" cards</label>
             <button id="game-start" class="gen">Start matching game</button>
+          </div>
+        </section>
+        <section id="tab-progress" class="tab-panel" hidden>
+          <div id="progress-box"></div>
+          <div class="options">
+            <label>Show quiz results from
+              <select id="progress-range">
+                <option value="7">the last 7 days</option>
+                <option value="30">the last 30 days</option>
+                <option value="all" selected>all time</option>
+              </select>
+            </label>
           </div>
         </section>
         <section id="tab-history" class="tab-panel" hidden>
