@@ -19,6 +19,19 @@
       </div>
       <p id="auth-msg" class="auth-msg"></p>
     </div>
+    <div id="account-dialog" class="auth" hidden>
+      <div class="auth-box">
+        <h2>Your account</h2>
+        <p class="auth-sub" id="acct-email"></p>
+        <p class="auth-sub">Deleting your account permanently removes your history, quiz results and usage records. This cannot be undone.</p>
+        <input type="text" id="acct-confirm" placeholder="Type DELETE to confirm" autocomplete="off">
+        <div class="auth-actions">
+          <button id="acct-delete">Delete my account</button>
+          <button id="acct-close">Cancel</button>
+        </div>
+        <p id="acct-msg" class="auth-msg"></p>
+      </div>
+    </div>
   </div>
   <div class="app">
     <aside class="sidebar">
